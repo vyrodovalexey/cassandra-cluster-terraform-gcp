@@ -1,2 +1,2 @@
-### Examples of deploying solutions with terraform
+### Examples of deploying with terraform
 
