@@ -29,12 +29,34 @@ provider "google" {
   region        = "us-central1"
 }
 
-resource "google_compute_instance" "el-1" {
-  name         = "el-1"
+/*resource "google_compute_firewall" "kibana" {
+  name    = "kibana"
+  network = "default"
+
+
+  allow {
+    protocol = "tcp"
+    ports    = ["443" ]
+  }
+
+
+
+  allow {
+    protocol = "tcp"
+    ports    = ["80" ]
+  }
+
+  source_ranges = ["0.0.0.0/0"]
+  target_tags = ["kibana"]
+}*/
+
+
+resource "google_compute_instance" "influxdb-1" {
+  name         = "influxdb-1"
   machine_type = "${var.mtype}"
   zone         = "us-central1-a"
 
-  tags = ["elk"]
+  tags = ["influx"]
 
   boot_disk {
     initialize_params {
@@ -51,8 +73,8 @@ resource "google_compute_instance" "el-1" {
     }
   }
   provisioner "file" {
-    source      = "deploy-elasticsearch.sh"
-    destination = "/tmp/deploy-elasticsearch.sh"
+    source      = "deploy-influxdb.sh"
+    destination = "/tmp/deploy-influxdb.sh"
      connection {
       type = "ssh"
       user = "devops"
@@ -62,8 +84,21 @@ resource "google_compute_instance" "el-1" {
  }
 
   provisioner "file" {
-    source      = "elasticsearch.yml"
-    destination = "/tmp/elasticsearch.yml"
+    source      = "haproxy.cfg"
+    destination = "/tmp/haproxy.cfg"
+     connection {
+      type = "ssh"
+      user = "devops"
+      private_key = "${file("/home/devops/.ssh/id_rsa")}"
+      agent = false
+    }
+ }
+
+
+
+  provisioner "file" {
+    source      = "influxdb-relay.conf"
+    destination = "/tmp/influxdb-relay.conf"
      connection {
       type = "ssh"
       user = "devops"
@@ -71,7 +106,6 @@ resource "google_compute_instance" "el-1" {
       agent = false
     } 
  }
-
 
   provisioner "remote-exec" {
     connection {
@@ -81,20 +115,23 @@ resource "google_compute_instance" "el-1" {
       agent = false
     }
     inline = [
-      "chmod +x /tmp/deploy-elasticsearch.sh",
-      "sudo /tmp/deploy-elasticsearch.sh",
-      "sudo cp -f /tmp/elasticsearch.yml /etc/elasticsearch/elasticsearch.yml",
-      "sudo systemctl restart elasticsearch",
+      "chmod +x /tmp/deploy-influxdb.sh",
+      "sudo /tmp/deploy-influxdb.sh",
+      "sudo cp -f /tmp/haproxy.cfg /etc/haproxy/haproxy.cfg",
+      "sudo cp -f /tmp/influxdb-relay.conf /etc/influxdb-relay/influxdb-relay.conf",
+      "sudo systemctl restart influxdb",
+      "sudo systemctl restart influxdb-relay",
+      "sudo systemctl restart haproxy",
     ]
   }
 }
 
-resource "google_compute_instance" "el-2" {
-  name         = "el-2"
+resource "google_compute_instance" "influxdb-2" {
+  name         = "influxdb-2"
   machine_type = "${var.mtype}"
   zone         = "us-central1-b"
 
-  tags = ["elasticsearch"]
+  tags = ["influxdb"]
 
   boot_disk {
     initialize_params {
@@ -112,8 +149,8 @@ resource "google_compute_instance" "el-2" {
     }
   }
   provisioner "file" {
-    source      = "deploy-elasticsearch.sh"
-    destination = "/tmp/deploy-elasticsearch.sh"
+    source      = "deploy-influxdb.sh"
+    destination = "/tmp/deploy-influxdb.sh"
      connection {
       type = "ssh"
       user = "devops"
@@ -121,11 +158,21 @@ resource "google_compute_instance" "el-2" {
       agent = false
     } 
  }
-
 
   provisioner "file" {
-    source      = "elasticsearch.yml"
-    destination = "/tmp/elasticsearch.yml"
+    source      = "haproxy.cfg"
+    destination = "/tmp/haproxy.cfg"
+     connection {
+      type = "ssh"
+      user = "devops"
+      private_key = "${file("/home/devops/.ssh/id_rsa")}"
+      agent = false
+    }
+ }
+
+  provisioner "file" {
+    source      = "influxdb-relay.conf"
+    destination = "/tmp/influxdb-relay.conf"
      connection {
       type = "ssh"
       user = "devops"
@@ -133,7 +180,6 @@ resource "google_compute_instance" "el-2" {
       agent = false
     } 
  }
-
 
   provisioner "remote-exec" {
     connection {
@@ -143,82 +189,25 @@ resource "google_compute_instance" "el-2" {
       agent = false
     }
     inline = [
-      "chmod +x /tmp/deploy-elasticsearch.sh",
-      "sudo /tmp/deploy-elasticsearch.sh",
-      "sudo cp -f /tmp/elasticsearch.yml /etc/elasticsearch/elasticsearch.yml",
-      "sudo systemctl restart elasticsearch",
+      "chmod +x /tmp/deploy-influxdb.sh",
+      "sudo /tmp/deploy-influxdb.sh",
+      "sudo cp -f /tmp/haproxy.cfg /etc/haproxy/haproxy.cfg",
+      "sudo cp -f /tmp/influxdb-relay.conf /etc/influxdb-relay/influxdb-relay.conf",
+      "sudo systemctl restart influxdb",
+      "sudo systemctl restart influxdb-relay",
+      "sudo systemctl restart haproxy",
     ]
   }
+
 }
 
-resource "google_compute_instance" "el-3" {
-  name         = "el-3"
-  machine_type = "${var.mtype}"
-  zone         = "us-central1-c"
 
-  tags = ["elasticsearch"]
-
-  boot_disk {
-    initialize_params {
-      size = "${var.dsize}"
-      image = "debian-cloud/debian-9"
-      type = "${var.dtype}"
-    }
-  }
-
-
-  network_interface {
-    network = "default"
-
-    access_config {
-    }
-  }
-  provisioner "file" {
-    source      = "deploy-elasticsearch.sh"
-    destination = "/tmp/deploy-elasticsearch.sh"
-     connection {
-      type = "ssh"
-      user = "devops"
-      private_key = "${file("/home/devops/.ssh/id_rsa")}"
-      agent = false
-    } 
- }
-
-
-  provisioner "file" {
-    source      = "elasticsearch.yml"
-    destination = "/tmp/elasticsearch.yml"
-     connection {
-      type = "ssh"
-      user = "devops"
-      private_key = "${file("/home/devops/.ssh/id_rsa")}"
-      agent = false
-    } 
- }
-
-
-  provisioner "remote-exec" {
-    connection {
-      type = "ssh"
-      user = "devops"
-      private_key = "${file("/home/devops/.ssh/id_rsa")}"
-      agent = false
-    }
-    inline = [
-      "chmod +x /tmp/deploy-elasticsearch.sh",
-      "sudo /tmp/deploy-elasticsearch.sh",
-      "sudo cp -f /tmp/elasticsearch.yml /etc/elasticsearch/elasticsearch.yml",
-      "sudo systemctl restart elasticsearch",
-    ]
-  }
-}
-
-resource "google_compute_instance" "kb-1" {
+/*resource "google_compute_instance" "kb-1" {
   name         = "kb-1"
   machine_type = "${var.mtype}"
   zone         = "us-central1-a"
 
-  tags = ["elk"]
+  tags = ["kibana"]
 
   boot_disk {
     initialize_params {
@@ -290,3 +279,4 @@ resource "google_compute_instance" "kb-1" {
     ]
   }
 }
+*/
